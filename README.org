@@ -1,4 +1,11 @@
 #+title: Kalman Filter Library
 
+This is an implementation of the Kalman filter written in Rust.
 
-https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python
+There is a simple 1 dimensional implementation with no control input.
+
+There is also a generic version that works for all dimensions. It uses the [[https://nalgebra.org/][nalgebra]] library.
+
+The goal with this implementation is to make a working Rotor Extended Kalman Filter (REKF) to be able to track the attitude of a satellite.
+
+This implementation is based on the book [[https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python][Kalman and Bayesian Filters in Python]].
