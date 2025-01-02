@@ -9,23 +9,26 @@ use na::base::{SMatrix, SVector};
 use na::{ComplexField, RealField};
 use num_traits::Zero;
 
-pub struct KalmanFilter<T: RealField + ComplexField, const X: usize, const U: usize> {
+pub struct KalmanFilter<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize>
+{
     x: SVector<T, X>,            // State vector
     P: SMatrix<T, X, X>,         // State covariance matrix
     F: SMatrix<T, X, X>,         // State transition matrix
     Q: SMatrix<T, X, X>,         // Process noise covariance
     B: Option<SMatrix<T, X, U>>, // Control input matrix (can handle U-dimensional input)
-    H: SMatrix<T, X, X>,         // Measurement matrix
+    H: SMatrix<T, Z, X>,         // Measurement matrix
 }
 
-impl<T: RealField + ComplexField, const X: usize, const U: usize> KalmanFilter<T, X, U> {
+impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize>
+    KalmanFilter<T, X, Z, U>
+{
     pub fn new(
         x: SVector<T, X>,
         P: SMatrix<T, X, X>,
         F: SMatrix<T, X, X>,
         Q: SMatrix<T, X, X>,
         B: Option<SMatrix<T, X, U>>,
-        H: SMatrix<T, X, X>,
+        H: SMatrix<T, Z, X>,
     ) -> Self {
         KalmanFilter { x, P, F, Q, B, H }
     }
@@ -34,8 +37,8 @@ impl<T: RealField + ComplexField, const X: usize, const U: usize> KalmanFilter<T
         &mut self,
         F: Option<SMatrix<T, X, X>>,
         Q: Option<SMatrix<T, X, X>>,
-        z: SVector<T, X>,
-        R: SMatrix<T, X, X>,
+        z: SVector<T, Z>,
+        R: SMatrix<T, Z, Z>,
         u: Option<SVector<T, U>>,
     ) {
         // Prediction step
@@ -110,7 +113,7 @@ mod tests {
         let Q = Matrix2::identity() * 0.1;
         let H = Matrix2::identity();
 
-        let mut kf: KalmanFilter<f32, 2, 1> = KalmanFilter::new(x, P, F, Q, None, H);
+        let mut kf: KalmanFilter<f32, 2, 2, 1> = KalmanFilter::new(x, P, F, Q, None, H);
 
         let z = Vector2::new(1.0, 1.0);
         let R = Matrix2::identity() * 0.1;
@@ -131,7 +134,7 @@ mod tests {
         let B = Matrix2x1::new(1.0, 0.0); // Control input affects only first state
         let H = Matrix2::identity();
 
-        let mut kf: KalmanFilter<f64, 2, 1> = KalmanFilter::new(x, P, F, Q, Some(B), H);
+        let mut kf: KalmanFilter<f64, 2, 2, 1> = KalmanFilter::new(x, P, F, Q, Some(B), H);
 
         let z = Vector2::new(1.0, 1.0);
         let R = Matrix2::identity() * 0.1;

@@ -41,7 +41,7 @@ fn main() {
     let B = Matrix2x1::new(1.0, 0.0); // Control input affects only first state
     let H = Matrix2::identity();
 
-    let mut kf: KalmanFilter<f64, 2, 1> = KalmanFilter::new(x, P, F, Q, Some(B), H);
+    let mut kf: KalmanFilter<f64, 2, 2, 1> = KalmanFilter::new(x, P, F, Q, Some(B), H);
 
     let z = Vector2::new(1.0, 1.0);
     let R = Matrix2::identity() * 0.1;
