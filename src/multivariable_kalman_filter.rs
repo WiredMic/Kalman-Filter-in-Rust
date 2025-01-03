@@ -7,7 +7,6 @@ use core::fmt::Debug;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use na::base::{SMatrix, SVector};
 use na::{ComplexField, RealField};
-use num_traits::Zero;
 
 pub struct KalmanFilter<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize>
 {
@@ -100,10 +99,11 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         self.B = Some(B);
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use na::{Matrix2, Matrix2x1, Vector1, Vector2};
+    use na::{Matrix1, Matrix1x2, Matrix2, Matrix2x1, Vector1, Vector2};
 
     #[test]
     fn test_simple_kalman() {
@@ -147,5 +147,32 @@ mod tests {
         assert!((state[0] - 0.985).abs() < 0.1);
         // Second state should not be affected by control input
         assert!((state[1] - 0.9).abs() < 0.1);
+    }
+    #[test]
+    fn test_with_different_measurement() {
+        // State vector dimension = 2
+        let x = Vector2::new(0.0, 0.0);
+        let P = Matrix2::identity();
+        let F = Matrix2::identity();
+        let Q = Matrix2::identity() * 0.1;
+
+        // Measurement matrix 1x2: maps 2D state to 1D measurement
+        let H = Matrix1x2::new(1.0, 0.0); // Only measure first state component
+
+        // Create Kalman filter with 2D state and 1D measurement
+        let mut kf: KalmanFilter<f32, 2, 1, 1> = KalmanFilter::new(x, P, F, Q, None, H);
+
+        // 1D measurement
+        let z = Vector1::new(1.0);
+        // 1x1 measurement noise covariance
+        let R = Matrix1::new(0.1);
+
+        kf.update(None, None, z, R, None);
+
+        let state = kf.get_state();
+        // First state should be updated based on measurement
+        assert!((state[0] - 0.9).abs() < 0.1);
+        // Second state should remain closer to initial value
+        assert!((state[1]).abs() < 0.1);
     }
 }
