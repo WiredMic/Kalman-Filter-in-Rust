@@ -32,12 +32,20 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         KalmanFilter { x, P, F, Q, B, H }
     }
 
-    pub fn update(
+    pub fn reinitialize(&mut self, x: SVector<T, X>, P: SMatrix<T, X, X>) {
+        // To be able to shutdown the filter and reuse the implimentation later
+        self.x = x;
+        self.P = P;
+    }
+
+    pub fn set_control_matrix(&mut self, B: SMatrix<T, X, U>) {
+        self.B = Some(B);
+    }
+
+    pub fn predict(
         &mut self,
         F: Option<SMatrix<T, X, X>>,
         Q: Option<SMatrix<T, X, X>>,
-        z: SVector<T, Z>,
-        R: SMatrix<T, Z, Z>,
         u: Option<SVector<T, U>>,
     ) {
         // Prediction step
@@ -58,21 +66,23 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         };
 
         // State prediction: \(\mathbf{F}\vec{x} + \mathbf{B}\vec{u} \)
-        let x_pred = &self.F * &self.x + control_input;
+        self.x = &self.F * &self.x + control_input;
 
         // Covariance prediction:  \(\mathbf{F}\mathbf{P}\mathbf{F}^\mathsf T + \mathbf{Q}  \)
-        let P_pred = &self.F * &self.P * &self.F.transpose() + &self.Q;
+        self.P = &self.F * &self.P * &self.F.transpose() + &self.Q;
+    }
 
+    pub fn update(&mut self, z: SVector<T, Z>, R: SMatrix<T, Z, Z>) {
         // Update step
         // Measurement residual: \( \vec{z} - \mathbf{H}\bar{\vec{x}}\)
-        let y = z - &self.H * &x_pred;
+        let y = z - &self.H * &self.x;
 
         // Innovation covariance: \(\mathbf{S} = \mathbf{H\bar{P}H}^\mathsf T + \mathbf R\)
-        let S = &self.H * &P_pred * &self.H.transpose() + R;
+        let S = &self.H * &self.P * &self.H.transpose() + R;
 
         // Kalman gain: \( \mathbf K = \mathbf{\bar{P}H}^{\mathsf T} \mathbf{S}^{-1} \)
         let K = match S.try_inverse() {
-            Some(S_inv) => &P_pred * &self.H.transpose() * S_inv,
+            Some(S_inv) => &self.P * &self.H.transpose() * S_inv,
             None => {
                 // Handle singular matrix case - could return Result instead
                 return;
@@ -80,10 +90,10 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         };
 
         // Update state estimate: \( \vec{x} = \bar{\vec{x}} + \mathbf{K}\vec{y}\)
-        self.x = x_pred + &K * y;
+        self.x = &self.x + &K * y;
 
         // Update covariance estimate: \(\mathbf P = (\mathbf I - \mathbf{KH})\mathbf{\bar{P}}  \)
-        self.P = &P_pred + K * &self.H * &P_pred;
+        self.P = &self.P + K * &self.H * &self.P;
     }
 
     // Getter methods
@@ -93,10 +103,6 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
 
     pub fn get_covariance(&self) -> &SMatrix<T, X, X> {
         &self.P
-    }
-
-    pub fn set_control_matrix(&mut self, B: SMatrix<T, X, U>) {
-        self.B = Some(B);
     }
 }
 
@@ -118,7 +124,8 @@ mod tests {
         let z = Vector2::new(1.0, 1.0);
         let R = Matrix2::identity() * 0.1;
 
-        kf.update(None, None, z, R, None);
+        kf.predict(None, None, None);
+        kf.update(z, R);
 
         let state = kf.get_state();
         assert!((state[0] - 0.9).abs() < 0.1);
@@ -140,7 +147,8 @@ mod tests {
         let R = Matrix2::identity() * 0.1;
         let u = Vector1::new(0.5); // Single control input
 
-        kf.update(None, None, z, R, Some(u));
+        kf.predict(None, None, Some(u));
+        kf.update(z, R);
 
         let state = kf.get_state();
         // First state should be affected by control input
@@ -167,7 +175,8 @@ mod tests {
         // 1x1 measurement noise covariance
         let R = Matrix1::new(0.1);
 
-        kf.update(None, None, z, R, None);
+        kf.predict(None, None, None);
+        kf.update(z, R);
 
         let state = kf.get_state();
         // First state should be updated based on measurement

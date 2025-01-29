@@ -47,7 +47,8 @@ fn main() {
     let R = Matrix2::identity() * 0.1;
     let u = Vector1::new(0.5); // Single control input
 
-    kf.update(None, None, z, R, Some(u));
+    kf.predict(None, None, Some(u));
+    kf.update(z, R);
 
     let state = kf.get_state();
     println!("the controlled is {}", state[0]);
