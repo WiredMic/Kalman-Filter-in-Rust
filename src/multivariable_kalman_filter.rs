@@ -1,26 +1,78 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(non_snake_case)]
+#![warn(missing_docs)]
 
 extern crate nalgebra as na;
-use core::fmt::Debug;
-use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+// use core::fmt::Debug;
 use na::base::{SMatrix, SVector};
 use na::{ComplexField, RealField};
 
+/// Kalman Filter
+///
+/// # Generic
+/// `T` is the type of every element in the vectors and matrices
+///
+/// `X` is the size of the state estimate
+///
+/// `U` is the size of the column in the control input
+///
+/// `Z` is the size of the row in the measurement function
+///
+/// # Example
+/// ```
+/// let x = Vector2::new(0.0, 0.0);
+/// let P = Matrix2::identity();
+/// let F = Matrix2::identity();
+/// let Q = Matrix2::identity() * 0.1;
+/// let B = Matrix2x1::new(1.0, 0.0); // Control input affects only first state
+/// let H = Matrix2::identity();
+///
+/// let mut kf: KalmanFilter<f64, 2, 2, 1> = KalmanFilter::new(x, P, F, Q, Some(B), H);
+///
+/// let z = Vector2::new(1.0, 1.0);
+/// let R = Matrix2::identity() * 0.1;
+/// let u = Vector1::new(0.5); // Single control input
+///
+/// kf.predict(None, None, Some(u));
+/// kf.update(z, R);
+///
+/// let state = kf.get_state();
+/// println!("the controlled is {}", state[0]);
+/// ```
+///
 pub struct KalmanFilter<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize>
 {
-    x: SVector<T, X>,            // State vector
-    P: SMatrix<T, X, X>,         // State covariance matrix
-    F: SMatrix<T, X, X>,         // State transition matrix
-    Q: SMatrix<T, X, X>,         // Process noise covariance
-    B: Option<SMatrix<T, X, U>>, // Control input matrix (can handle U-dimensional input)
-    H: SMatrix<T, Z, X>,         // Measurement matrix
+    /// The state estimate
+    x: SVector<T, X>,
+    /// The state covariance matrix
+    P: SMatrix<T, X, X>,
+    /// State transition matrix
+    F: SMatrix<T, X, X>,
+    /// Process noise covariance matrix
+    Q: SMatrix<T, X, X>,
+    /// Control input matrix (can handle U-dimensional input)
+    B: Option<SMatrix<T, X, U>>,
+    /// Measurement matrix
+    H: SMatrix<T, Z, X>,
 }
 
 impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize>
     KalmanFilter<T, X, Z, U>
 {
+    /// # Input
+    /// `x` is the initial state estiamate
+    ///
+    /// `P` is the initial state covariance matrix
+    ///
+    /// `F` is the state transition matrix
+    ///
+    /// `Q` is the process noice covariance matrix
+    ///
+    /// `B` is an optional control input matrix
+    ///
+    /// `H` is the measurement matrix
+    ///
     pub fn new(
         x: SVector<T, X>,
         P: SMatrix<T, X, X>,
@@ -32,16 +84,27 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         KalmanFilter { x, P, F, Q, B, H }
     }
 
+    /// Reinitialize the state estimate and state covariance matrix
+    ///
+    /// This can be done to reuse the Kalman filter after a period of disuse
     pub fn reinitialize(&mut self, x: SVector<T, X>, P: SMatrix<T, X, X>) {
         // To be able to shutdown the filter and reuse the implimentation later
         self.x = x;
         self.P = P;
     }
 
+    /// Set new control input matrix
     pub fn set_control_matrix(&mut self, B: SMatrix<T, X, U>) {
         self.B = Some(B);
     }
 
+    /// # Prediction step of the Kalman filter
+    /// ## input
+    /// `F` change the state transition matrix
+    ///
+    /// `Q` change the process noice covariance matrix
+    ///
+    /// `u` is the control input vector
     pub fn predict(
         &mut self,
         F: Option<SMatrix<T, X, X>>,
@@ -72,6 +135,7 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         self.P = &self.F * &self.P * &self.F.transpose() + &self.Q;
     }
 
+    /// Update step of the Kalman filter
     pub fn update(&mut self, z: SVector<T, Z>, R: SMatrix<T, Z, Z>) {
         // Update step
         // Measurement residual: \( \vec{z} - \mathbf{H}\bar{\vec{x}}\)
@@ -96,11 +160,12 @@ impl<T: RealField + ComplexField, const X: usize, const Z: usize, const U: usize
         self.P = &self.P + K * &self.H * &self.P;
     }
 
-    // Getter methods
+    /// Get state estimate
     pub fn get_state(&self) -> &SVector<T, X> {
         &self.x
     }
 
+    /// Get state covariance matrix
     pub fn get_covariance(&self) -> &SMatrix<T, X, X> {
         &self.P
     }
